@@ -1,0 +1,13 @@
+{
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.pytest_cache": true,
+        "**/.venv": true,
+        // "**/wandb": true,
+        // "**/runs": true,
+        // "**/checkpoints": true,
+        "**/outputs": true
+    },
+    "markdown.preview.fontSize": 18,
+    "markdown.preview.lineHeight": 1.8
+}

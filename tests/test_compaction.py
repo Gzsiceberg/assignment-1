@@ -71,9 +71,10 @@ def attach_response(agent, response):
     return calls
 
 
-def test_compaction_preserves_configured_recent_steps(agent):
+@pytest.mark.parametrize("finish_reason", ["stop", "tool_calls"])
+def test_compaction_preserves_configured_recent_steps(agent, finish_reason):
     before = deepcopy(agent.build_prompt())
-    response = completion("Inspected files; continue investigating.")
+    response = completion("Inspected files; continue investigating.", finish_reason=finish_reason)
     calls = attach_response(agent, response)
     prompt, returned = agent.compact_context()
     after = agent.build_prompt()
@@ -101,3 +102,17 @@ def test_invalid_compaction_leaves_history_unchanged(agent, response):
     with pytest.raises(RuntimeError):
         agent.compact_context()
     assert agent.build_prompt() == before
+
+
+@pytest.mark.parametrize("finish_reason, expected_finished", [("stop", True), ("length", False)])
+def test_action_stop_reason_marks_agent_finished(agent, finish_reason, expected_finished):
+    agent.api_prompts = []
+    agent.api_responses = []
+    agent.steps_taken = 0
+    agent.step_limit = 10
+    agent.tools = []
+    agent.finished = False
+    attach_response(agent, completion("Final answer", finish_reason=finish_reason))
+    message = agent.query_language_model()
+    assert message["content"] == "Final answer"
+    assert agent.finished is expected_finished
