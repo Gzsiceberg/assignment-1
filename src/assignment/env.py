@@ -103,7 +103,7 @@ class Environment:
 
     def __init__(
         self,
-        image: "str | PurePath | modal.Image" = "python:3.12",
+        image: "str | PurePath | modal.Image | None" = None,
         cwd: str = "/",
         startup_timeout: float = 600,
         runtime_timeout: float = 600,
@@ -116,7 +116,8 @@ class Environment:
 
         Args:
             image: A prebuilt `modal.Image`, a Dockerhub or ECR image name, or a
-                path to a Dockerfile. Build a task testbed with
+                path to a Dockerfile. None uses Modal's Python 3.12 Debian image
+                instead of pulling from Docker Hub. Build a task testbed with
                 `assignment.utils.image.build_testbed_image`, which is the only
                 way to pass a credential to a private clone.
             cwd: Working directory for commands that do not specify one.
@@ -138,6 +139,8 @@ class Environment:
         self.cwd = cwd
         # Merged into every command's environment; a per-call `env` wins.
         self.env_defaults: dict[str, str] = {}
+        if image is None:
+            image = modal.Image.debian_slim(python_version="3.12")
         self.deployment = AssignmentModalDeployment(
             image=image,
             startup_timeout=startup_timeout,
@@ -303,7 +306,7 @@ class Environment:
                 await asyncio.wait_for(self.deployment.stop(), timeout=timeout)
             finally:
                 if sandbox is not None:
-                    await asyncio.wait_for(sandbox.terminate.aio(), timeout=timeout)
+                    await asyncio.wait_for(sandbox.terminate.aio(wait=True), timeout=timeout)
 
         asyncio.run(_stop())
 

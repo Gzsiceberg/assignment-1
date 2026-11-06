@@ -202,7 +202,7 @@ dev = [
 requires-dist = [
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "jinja2", specifier = ">=3.1.6" },
-    { name = "modal", specifier = ">=1.5.3" },
+    { name = "modal", specifier = ">=1.6.3" },
     { name = "openai", specifier = ">=2.52.0" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "pyyaml", specifier = ">=6.0" },
