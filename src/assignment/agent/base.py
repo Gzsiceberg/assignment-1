@@ -16,6 +16,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from openai import OpenAI
+import yaml
 
 from assignment.env import Environment
 from assignment.agent.tools import INVOKE_SKILL_TOOL
@@ -152,6 +153,7 @@ class Agent:
 
         # TODO(1.1.a): Add machinery to maintain agent state as it takes actions
         # and observes the results.
+        self.assistant_messages: list[dict[str, Any]] = []
 
     def load_skills(self, skills_path: Path) -> dict[str, dict[str, str]]:
         """Load the skill folders exposed to this agent."""
@@ -164,7 +166,40 @@ class Agent:
         # ``content`` of the skill file for ``invoke_skill``. Reject duplicate
         # names and malformed or missing frontmatter with a clear
         # ``ValueError``.
-        raise NotImplementedError
+        if not skills_path.is_dir():
+            raise ValueError(f"Skills path {skills_path} is not a directory.")
+        skills_md_files = sorted(skills_path.glob("*/SKILL.md"))
+        output: dict[str, dict[str, str]] = {}
+        for skill_file_path in skills_md_files:
+            content = skill_file_path.read_text(encoding="utf-8")
+            lines = content.splitlines()
+            if not lines or lines[0].strip() != "---":
+                raise ValueError(f"Missing YAML frontmatter in {skill_file_path}")
+            closing = next(
+                (i for i in range(1, len(lines)) if lines[i].strip() == "---"),
+                None,
+            )
+            if closing is None:
+                raise ValueError(f"Unclosed YAML frontmatter in {skill_file_path}")
+            try:
+                frontmatter = yaml.safe_load("\n".join(lines[1:closing]))
+            except yaml.YAMLError as exc:
+                raise ValueError(f"Malformed YAML frontmatter in {skill_file_path}") from exc
+            if not isinstance(frontmatter, dict):
+                raise ValueError(f"Frontmatter must be a mapping in {skill_file_path}")
+            for field in ("name", "description"):
+                value = frontmatter.get(field)
+                if not isinstance(value, str) or not value.strip():
+                    raise ValueError(f"Frontmatter requires a non-empty {field} in {skill_file_path}")
+            skill_name = frontmatter["name"]
+            metadata = yaml.safe_dump(
+                {"name": skill_name, "description": frontmatter["description"]},
+                sort_keys=False,
+            ).strip()
+            if skill_name in output:
+                raise ValueError(f"Duplicate skill name: {skill_name}")
+            output[skill_name] = {"metadata": metadata, "content": content}
+        return output
 
     def query_language_model(self) -> dict[str, Any]:
         """Send one tool-enabled Chat Completions request and normalize it."""
@@ -227,7 +262,10 @@ class Agent:
 
         # You want to be careful about which attributes of the class you modify
         # here as they may also be handled by the subclasses.
-        raise NotImplementedError
+        return [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": self.task_prompt},
+        ] + self.assistant_messages
 
     def estimate_active_prompt_tokens(self) -> int:
         """Estimate the next prompt, calibrated by the provider's latest usage."""
@@ -336,7 +374,24 @@ class Agent:
             # and handles the threshold, and tracks compaction events for
             # logging.
 
-            raise NotImplementedError
+            for step in range(self.step_limit):
+                response = self.query_language_model()
+                self.assistant_messages.append(response)
+                if "tool_calls" in response:
+                    tool_calls = response["tool_calls"]
+                    tool_results = self.execute_tool_calls(tool_calls)
+                    self.assistant_messages.extend(tool_results)
+                # Text-only turns are retained as context, not treated as a
+                # domain-specific completion signal.
+
+                if self.finished:
+                    print(f"[agent] finished after {step} steps", flush=True)
+                    break
+
+            if not self.finished:
+                raise StepLimitError(
+                    f"Agent did not finish after {self.step_limit} steps."
+                )
         finally:
             # This block is provided infrastructure. Do not modify it: a
             # trajectory is required even when a run fails.
