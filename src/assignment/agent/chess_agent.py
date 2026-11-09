@@ -107,6 +107,7 @@ class ChessAgent(Agent):
         )
 
         # TODO(Part 3): Register the play_move tool schema from tools.py.
+        self.tools.append(PLAY_MOVE_TOOL)
 
         if programmatic_tools:
             self.tools.append(RUN_PYTHON_TOOL)
@@ -174,7 +175,58 @@ class ChessAgent(Agent):
         # 4. Link every observation to its call with tool_call_id.
         # 5. Turn malformed, unknown, rejected, or extra parallel calls into
         #    recoverable <chess_error> observations instead of crashing.
+        valid_tool_names = [PLAY_MOVE_TOOL["function"]["name"]]
+        if self.skills:
+            valid_tool_names.append(INVOKE_SKILL_TOOL["function"]["name"])
+
+        tool_results = []
+        has_play_move = False
+        for tool_call in tool_calls:
+            tool_function = tool_call.get("function", {})
+            tool_name = tool_function.get("name")
+            tool_call_id = tool_call.get("id")
+            arguments = tool_function.get("arguments", "{}")
+            if not tool_call_id:
+                tool_results.append(
+                    {
+                        "role": "tool",
+                        "content": f"Tool call is missing an id: {tool_call}"
+                    }
+                )
+                continue
+
+            if tool_name not in valid_tool_names:
+                tool_results.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call_id,
+                        "content": f"<chess_error>Unknown tool: {tool_name}</chess_error>",
+                    }
+                )
+                continue
+
+            if tool_name == PLAY_MOVE_TOOL["function"]["name"]:
+                if has_play_move:
+                    result = "<chess_error>Multiple play_move calls in one response are not allowed.</chess_error>"
+                else:
+                    result = _play_move(self.chess_client, arguments)
+                    has_play_move = True
+                if "<chess_error>" not in result:
+                    try:
+                        new_state = json.loads(result)
+                        self.last_state = new_state
+                        self.finished = bool(new_state.get("game_over"))
+                        result = self.format_state(new_state)
+                    except Exception as exc:
+                        result = f"<chess_error>Failed to parse play_move result: {exc}</chess_error>"
+                tool_results.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call_id,
+                        "content": result,
+                    }
+                )
 
         # TODO(Part 3.3-4): add cases for simulate_move and run_python, with
         # linked observations and recoverable errors, just like the old tool.
-        raise NotImplementedError
+        return tool_results

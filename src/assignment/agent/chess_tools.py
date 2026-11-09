@@ -12,8 +12,17 @@ import json
 from typing import Any
 
 import httpx
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError
 
 CHESS_PORT = 8000
+
+
+class ToolArguments(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+
+class PlayMoveArguments(ToolArguments):
+    move: str
 
 
 def _request_state(
@@ -67,7 +76,23 @@ def _play_move(client: httpx.Client, arguments: str) -> str:
     # for the agent to address. Cover malformed JSON arguments, arguments
     # that are not an object, a missing or non-string fen, a non-string move,
     # a position or move the server rejects, and a transport failure.
-    raise NotImplementedError
+    try:
+        args = PlayMoveArguments.model_validate_json(arguments)
+    except ValidationError as exc:
+        return f"<chess_error>Invalid arguments: {exc}</chess_error>"
+
+    try:
+        payload = _request_state(client, "POST", "/api/move", json={"move": args.move})
+        return json.dumps(payload)
+    except ValueError as exc:
+        return f"<chess_error>Illegal move: {exc}</chess_error>"
+    except RuntimeError as exc:
+        return f"<chess_error>Server error: {exc}</chess_error>"
+    except httpx.RequestError as exc:
+        return f"<chess_error>Transport failure: {exc}</chess_error>"
+
+
+
 
 
 def _run_python(env: Any, port: int, arguments: str) -> str:
