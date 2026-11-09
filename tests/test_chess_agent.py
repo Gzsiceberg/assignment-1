@@ -106,7 +106,7 @@ def test_play_move_schema_is_strict_and_registered(make_agent):
     assert parameters["properties"]["move"]["type"] == "string"
     assert parameters["required"] == ["move"]
     assert parameters["additionalProperties"] is False
-    assert make_agent.tools == [PLAY_MOVE_TOOL]
+    assert PLAY_MOVE_TOOL in make_agent.tools
 
 
 def test_initial_prompt_contains_board_and_legal_moves(make_agent):

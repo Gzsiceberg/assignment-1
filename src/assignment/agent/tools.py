@@ -163,7 +163,42 @@ PLAY_MOVE_TOOL: dict = {
 }
 
 # TODO(3.3): Define the `simulate_move` tool, like the `play_move` tool.
-SIMULATE_MOVE_TOOL: dict = {}
+SIMULATE_MOVE_TOOL: dict = {
+    "type": "function",
+    "function": {
+        "name": "simulate_move",
+        "description": (
+            """
+            Simulate a move in the current chess game.
+            The FEN of the position to simulate the move from.
+            Moves use UCI notation, for example e2e4.
+            The move must be legal in the current position. If the move is
+            illegal, the tool will return an error message. If the move is legal, the
+            tool will update the game state and return the new position.
+            """
+        ),
+        "strict": True,
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "fen": {
+                    "type": "string",
+                    "description": (
+                        "The FEN of the position to simulate the move from."
+                    ),
+                },
+                "move": {
+                    "type": ["string", "null"],
+                    "description": (
+                        "The move to play in UCI notation, for example e2e4."
+                    ),
+                },
+            },
+            "required": ["fen"],
+            "additionalProperties": False,
+        },
+    },
+}
 
 # TODO()
 RUN_PYTHON_TOOL: dict = {}

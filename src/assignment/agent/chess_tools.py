@@ -22,7 +22,21 @@ class ToolArguments(BaseModel):
 
 
 class PlayMoveArguments(ToolArguments):
-    move: str
+    move: str = Field(
+        ...,
+        description="The move to play in UCI notation, for example e2e4.",
+    )
+
+
+class SimulateMoveArguments(ToolArguments):
+    fen: str = Field(
+        ...,
+        description="The FEN of the position to simulate the move from.",
+    )
+    move: str | None = Field(
+        default=None,
+        description="The move to simulate in UCI notation, for example e2e4. If not provided, only the FEN will be returned.",
+    )
 
 
 def _request_state(
@@ -61,7 +75,21 @@ def _simulate_move(client: httpx.Client, arguments: str) -> str:
     # JSON arguments, arguments that are not an object, a missing or
     # non-string fen, a non-string move, a position or move the server rejects,
     # and a transport failure.
-    raise NotImplementedError
+    try:
+        args = SimulateMoveArguments.model_validate_json(arguments)
+    except ValidationError as exc:
+        return f"<chess_error>Invalid arguments: {exc}</chess_error>"
+
+    try:
+        payload = _request_state(client, "POST", "/api/simulate",
+                                 json=args.model_dump(exclude_none=True))
+        return json.dumps(payload)
+    except ValueError as exc:
+        return f"<chess_error>Illegal move: {exc}</chess_error>"
+    except RuntimeError as exc:
+        return f"<chess_error>Server error: {exc}</chess_error>"
+    except httpx.RequestError as exc:
+        return f"<chess_error>Transport failure: {exc}</chess_error>"
 
 
 def _play_move(client: httpx.Client, arguments: str) -> str:
@@ -82,7 +110,7 @@ def _play_move(client: httpx.Client, arguments: str) -> str:
         return f"<chess_error>Invalid arguments: {exc}</chess_error>"
 
     try:
-        payload = _request_state(client, "POST", "/api/move", json={"move": args.move})
+        payload = _request_state(client, "POST", "/api/move", json=args.model_dump())
         return json.dumps(payload)
     except ValueError as exc:
         return f"<chess_error>Illegal move: {exc}</chess_error>"

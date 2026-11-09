@@ -108,6 +108,7 @@ class ChessAgent(Agent):
 
         # TODO(Part 3): Register the play_move tool schema from tools.py.
         self.tools.append(PLAY_MOVE_TOOL)
+        self.tools.append(SIMULATE_MOVE_TOOL)
 
         if programmatic_tools:
             self.tools.append(RUN_PYTHON_TOOL)
@@ -178,6 +179,7 @@ class ChessAgent(Agent):
         valid_tool_names = [PLAY_MOVE_TOOL["function"]["name"]]
         if self.skills:
             valid_tool_names.append(INVOKE_SKILL_TOOL["function"]["name"])
+        valid_tool_names.append(SIMULATE_MOVE_TOOL["function"]["name"])
 
         tool_results = []
         has_play_move = False
@@ -226,7 +228,15 @@ class ChessAgent(Agent):
                         "content": result,
                     }
                 )
-
+            if tool_name == SIMULATE_MOVE_TOOL["function"]["name"]:
+                result = _simulate_move(self.chess_client, arguments)
+                tool_results.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call_id,
+                        "content": result,
+                    }
+                )
         # TODO(Part 3.3-4): add cases for simulate_move and run_python, with
         # linked observations and recoverable errors, just like the old tool.
         return tool_results
