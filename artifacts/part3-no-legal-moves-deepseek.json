@@ -1,0 +1,16 @@
+{
+  "prompts": [
+    [
+      {
+        "role": "system",
+        "content": "You are playing White in a chess game against a deterministic Black bot.\n\nUse the `play_move` tool for every move. Infer a legal UCI move from the latest\nboard and FEN, then inspect the returned board before choosing the next move.\nUppercase pieces are White; lowercase pieces are Black; `.` is an empty square.\nThe server applies Black's reply automatically, so never submit a move for Black\nand never assume what Black played. Promotion moves include a piece suffix, for\nexample `e7e8q`.\n\nContinue until the returned state says `game_over: true`. While the game is\nactive, make a tool call instead of merely describing a move in text."
+      },
+      {
+        "role": "user",
+        "content": "Play this game as White. Infer a legal move from the board and FEN, then call play_move.\n\n<chess_state>\nstatus: Your turn\nturn: white\nin_check: False\ngame_over: False\nfen: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1\nhuman_move: (none)\nengine_move: (none)\nboard:\n    a b c d e f g h\n8 | r n b q k b n r | 8\n7 | p p p p p p p p | 7\n6 | . . . . . . . . | 6\n5 | . . . . . . . . | 5\n4 | . . . . . . . . | 4\n3 | . . . . . . . . | 3\n2 | P P P P P P P P | 2\n1 | R N B Q K B N R | 1\n    a b c d e f g h\nrecent_history: (none)\n</chess_state>"
+      }
+    ]
+  ],
+  "responses": [],
+  "compactions": []
+}
