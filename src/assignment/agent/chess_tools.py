@@ -39,6 +39,10 @@ class SimulateMoveArguments(ToolArguments):
     )
 
 
+class InvokeSkillArguments(ToolArguments):
+    name: str
+
+
 class RunPythonArguments(ToolArguments):
     code: str = Field(
         ...,
@@ -180,10 +184,16 @@ def _run_python(env: Any, port: int, arguments: str) -> str:
 
 def _invoke_skill(skills: dict[str, dict[str, str]], arguments: str) -> str:
     """Existing tool: load one skill's instructions into the conversation."""
-    # TODO(3.5): parse the arguments and return the named skill's content.
-    # Return <chess_error>{message}</chess_error> if there are issues like type
-    # mismatches or parsing failures.
-    raise NotImplementedError
+    try:
+        args = InvokeSkillArguments.model_validate_json(arguments)
+        if args.name not in skills:
+            return f"<chess_error>Unknown skill: {args.name}</chess_error>"
+        content = skills[args.name]["content"]
+        if not isinstance(content, str):
+            raise TypeError("Skill content must be a string.")
+        return content
+    except (ValidationError, KeyError, TypeError) as exc:
+        return f"<chess_error>Invalid invoke_skill request: {exc}</chess_error>"
 
 
 def _game_state(client: httpx.Client, reset: bool = False) -> dict:

@@ -244,6 +244,15 @@ class ChessAgent(Agent):
                     }
                 )
 
+            if tool_name == INVOKE_SKILL_TOOL["function"]["name"]:
+                tool_results.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call_id,
+                        "content": _invoke_skill(self.skills, arguments),
+                    }
+                )
+
             if tool_name == RUN_PYTHON_TOOL["function"]["name"]:
                 result = _run_python(self.env, self.python_sandbox_port, arguments)
                 # A snippet may commit a move before failing, so always refresh.
