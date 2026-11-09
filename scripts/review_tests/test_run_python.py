@@ -9,6 +9,7 @@ import pytest
 
 from assignment.agent.chess_agent import ChessAgent
 from assignment.agent.chess_tools import _run_python
+from assignment.agent.tools import PLAY_MOVE_TOOL, RUN_PYTHON_TOOL, SIMULATE_MOVE_TOOL
 
 
 def test_run_python_returns_runner_stdout_unchanged():
@@ -68,6 +69,7 @@ def test_dispatch_always_refreshes_and_preserves_output(
     agent.chess_client = object()
     agent.python_sandbox_port = 8000
     agent.programmatic_tools = True
+    agent.tools = [PLAY_MOVE_TOOL, RUN_PYTHON_TOOL, SIMULATE_MOVE_TOOL]
     agent.skills = {}
     agent.last_state = {"game_over": False}
     agent.finished = False

@@ -104,8 +104,8 @@ def test_invalid_compaction_leaves_history_unchanged(agent, response):
     assert agent.build_prompt() == before
 
 
-@pytest.mark.parametrize("finish_reason, expected_finished", [("stop", True), ("length", False)])
-def test_action_stop_reason_marks_agent_finished(agent, finish_reason, expected_finished):
+@pytest.mark.parametrize("finish_reason", ["stop", "length"])
+def test_text_only_response_does_not_finish_agent(agent, finish_reason):
     agent.api_prompts = []
     agent.api_responses = []
     agent.steps_taken = 0
@@ -115,4 +115,4 @@ def test_action_stop_reason_marks_agent_finished(agent, finish_reason, expected_
     attach_response(agent, completion("Final answer", finish_reason=finish_reason))
     message = agent.query_language_model()
     assert message["content"] == "Final answer"
-    assert agent.finished is expected_finished
+    assert agent.finished is False

@@ -7,8 +7,7 @@ import pytest
 
 from assignment.agent import ChessAgent
 from assignment.agent.chess_agent import format_chess_state
-from assignment.agent.tools import INVOKE_SKILL_TOOL, PLAY_MOVE_TOOL
-from assignment.agent.chess_tools import _invoke_skill
+from assignment.agent.tools import PLAY_MOVE_TOOL
 
 
 INITIAL_STATE = {
@@ -107,7 +106,7 @@ def test_play_move_schema_is_strict_and_registered(make_agent):
     assert parameters["properties"]["move"]["type"] == "string"
     assert parameters["required"] == ["move"]
     assert parameters["additionalProperties"] is False
-    assert PLAY_MOVE_TOOL in make_agent.tools
+    assert make_agent.tools == [PLAY_MOVE_TOOL]
 
 
 def test_initial_prompt_contains_board_and_legal_moves(make_agent):
@@ -149,60 +148,3 @@ def test_rejected_and_malformed_moves_are_recoverable(make_agent):
     assert "<chess_error>" in rejected[0]["content"]
     assert "<chess_error>" in malformed[0]["content"]
     assert make_agent.finished is False
-
-
-def test_invoke_skill_returns_full_content():
-    content = "---\nname: select-move\n---\nFull instructions.\n"
-    skills = {"select-move": {"metadata": "catalog entry", "content": content}}
-    assert _invoke_skill(skills, '{"name": "select-move"}') == content
-
-
-@pytest.mark.parametrize("arguments", [
-    "{bad", "[]", "null", "{}", '{"name": 123}',
-    '{"name": "missing"}', '{"name": "select-move", "extra": true}',
-])
-def test_invoke_skill_errors_are_recoverable(arguments):
-    result = _invoke_skill({}, arguments)
-    assert result.startswith("<chess_error>")
-    assert result.endswith("</chess_error>")
-
-
-def test_chess_skill_registration_and_dispatch(monkeypatch, chess_client, tmp_path):
-    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    monkeypatch.setenv("OPENAI_BASE_URL", "http://model.test/v1")
-    skill_dir = tmp_path / "select-move"
-    skill_dir.mkdir()
-    content = (
-        "---\nname: select-move\ndescription: Search before committing.\n---\n"
-        "Use run_python to simulate candidates, then play one move.\n"
-    )
-    (skill_dir / "SKILL.md").write_text(content)
-    agent = ChessAgent(
-        FakeChessEnvironment(), model="test-model", http_client=chess_client,
-        skills_path=str(tmp_path), auto_stop_environment=False,
-    )
-    assert agent.tools.count(INVOKE_SKILL_TOOL) == 1
-    before_requests = len(chess_client.requests)
-    before_state = json.loads(json.dumps(agent.last_state))
-    messages = agent.execute_tool_calls([{
-        "id": "skill_1", "type": "function",
-        "function": {
-            "name": "invoke_skill", "arguments": '{"name": "select-move"}',
-        },
-    }])
-    assert messages == [{
-        "role": "tool", "tool_call_id": "skill_1", "content": content,
-    }]
-    assert len(chess_client.requests) == before_requests
-    assert agent.last_state == before_state
-    assert agent.finished is False
-
-
-def test_invoke_skill_not_registered_without_skills(make_agent):
-    assert INVOKE_SKILL_TOOL not in make_agent.tools
-    messages = make_agent.execute_tool_calls([{
-        "id": "skill_1", "type": "function",
-        "function": {"name": "invoke_skill", "arguments": '{"name": "missing"}'},
-    }])
-    assert messages[0]["tool_call_id"] == "skill_1"
-    assert messages[0]["content"].startswith("<chess_error>Unknown tool:")

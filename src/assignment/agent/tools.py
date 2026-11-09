@@ -169,12 +169,12 @@ SIMULATE_MOVE_TOOL: dict = {
         "name": "simulate_move",
         "description": (
             """
-            Simulate a move in the current chess game.
-            The FEN of the position to simulate the move from.
-            Moves use UCI notation, for example e2e4.
-            The move must be legal in the current position. If the move is
-            illegal, the tool will return an error message. If the move is legal, the
-            tool will update the game state and return the new position.
+            Inspect a complete six-field FEN or simulate exactly one ply for
+            either side. This is stateless: it never changes the live game.
+            Pass move=null to inspect the supplied position and its legal moves,
+            or a legal UCI move such as e2e4 or e7e8q to obtain the position after
+            that move. Returns JSON with fen, squares, turn, legal_moves, and
+            terminal-result fields. Invalid positions or moves return an error.
             """
         ),
         "strict": True,
@@ -190,11 +190,11 @@ SIMULATE_MOVE_TOOL: dict = {
                 "move": {
                     "type": ["string", "null"],
                     "description": (
-                        "The move to play in UCI notation, for example e2e4."
+                        "A UCI move to simulate, or null to inspect the FEN without a move."
                     ),
                 },
             },
-            "required": ["fen"],
+            "required": ["fen", "move"],
             "additionalProperties": False,
         },
     },

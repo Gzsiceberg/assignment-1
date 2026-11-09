@@ -2,12 +2,14 @@
 
 Comparison of the four saved trajectories and result files. White is the model; Black is the deterministic server bot. Each condition has only one run.
 
-| Model | Legal moves shown? | Recorded outcome | Completed full moves | Model responses | Rejected illegal moves | Transport errors |
-| --- | --- | --- | ---: | ---: | ---: | ---: |
-| `deepseek-v4-flash` | No | Black wins by checkmate | 27 | 33 | 4 | 2 |
-| `deepseek-v4-flash` | Yes | Black wins by checkmate | 27 | 28 | 1 | 0 |
-| `gpt-oss-120b` | No | Unfinished; White to move | 21 | 26 | 0 | 0 |
-| `gpt-oss-120b` | Yes | Black wins by checkmate | 13 | 13 | 0 | 0 |
+| Model | Legal moves shown? | Recorded outcome | Completed full moves | Model responses | Total `play_move` calls | Rejected illegal moves | Invalid-move rate | Transport errors | `game_over` |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `deepseek-v4-flash` | No | Black wins by checkmate | 27 | 33 | 33 | 4 | 12.12% | 2 | true |
+| `deepseek-v4-flash` | Yes | Black wins by checkmate | 27 | 28 | 28 | 1 | 3.57% | 0 | true |
+| `gpt-oss-120b` | No | Unfinished; White to move | 21 | 26 | 21 | 0 | 0% | 0 | false |
+| `gpt-oss-120b` | Yes | Black wins by checkmate | 13 | 13 | 13 | 0 | 0% | 0 | true |
+
+Invalid-move rate is rejected illegal `play_move` calls divided by all `play_move` calls, including calls that encountered transport errors. Transport errors are reported separately and are not counted as illegal moves. Calls are counted once from `responses`, rather than from repeated prompt snapshots. The `game_over` values come from the corresponding result files.
 
 ## Comparison
 

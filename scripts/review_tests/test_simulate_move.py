@@ -79,7 +79,7 @@ def simulation_agent(monkeypatch, simulation_client):
 
     return ChessAgent(
         Environment(), model="test-model", http_client=simulation_client,
-        auto_stop_environment=False,
+        auto_stop_environment=False, programmatic_tools=True,
     )
 
 
@@ -98,7 +98,10 @@ def test_simulate_move_schema_and_registration(simulation_agent):
     assert parameters["type"] == "object"
     assert parameters["properties"]["fen"]["type"] == "string"
     assert set(parameters["properties"]) == {"fen", "move"}
-    assert "fen" in parameters["required"]
+    assert function["strict"] is True
+    assert set(parameters["required"]) == set(parameters["properties"])
+    assert parameters["properties"]["move"]["type"] == ["string", "null"]
+    assert "never changes the live game" in function["description"]
     assert parameters["additionalProperties"] is False
     assert SIMULATE_MOVE_TOOL in simulation_agent.tools
 

@@ -108,10 +108,9 @@ class ChessAgent(Agent):
 
         # TODO(Part 3): Register the play_move tool schema from tools.py.
         self.tools.append(PLAY_MOVE_TOOL)
-        self.tools.append(SIMULATE_MOVE_TOOL)
 
         if programmatic_tools:
-            self.tools.append(RUN_PYTHON_TOOL)
+            self.tools.extend([SIMULATE_MOVE_TOOL, RUN_PYTHON_TOOL])
 
         # run_python always executes in the sandbox, on the port the chess
         # server is listening on there.
@@ -177,15 +176,14 @@ class ChessAgent(Agent):
         # 4. Link every observation to its call with tool_call_id.
         # 5. Turn malformed, unknown, rejected, or extra parallel calls into
         #    recoverable <chess_error> observations instead of crashing.
-        valid_tool_names = [PLAY_MOVE_TOOL["function"]["name"]]
-        if self.skills:
-            valid_tool_names.append(INVOKE_SKILL_TOOL["function"]["name"])
-        valid_tool_names.append(SIMULATE_MOVE_TOOL["function"]["name"])
-        if self.programmatic_tools:
-            valid_tool_names.append(RUN_PYTHON_TOOL["function"]["name"])
+        valid_tool_names = {tool["function"]["name"] for tool in self.tools}
+        live_tool_names = {
+            PLAY_MOVE_TOOL["function"]["name"],
+            RUN_PYTHON_TOOL["function"]["name"],
+        }
 
         tool_results = []
-        has_play_move = False
+        live_call_seen = False
         for tool_call in tool_calls:
             tool_function = tool_call.get("function", {})
             tool_name = tool_function.get("name")
@@ -210,12 +208,23 @@ class ChessAgent(Agent):
                 )
                 continue
 
+            # Python may play a move even if its eventual result is an error.
+            # Conservatively allow only one potentially live-mutating call per
+            # response; simulations and skill reads remain safe to batch.
+            if tool_name in live_tool_names:
+                if live_call_seen:
+                    tool_results.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call_id,
+                        "content": "<chess_error>Only one play_move or run_python call "
+                        "is allowed per response. Inspect the updated state before "
+                        "requesting another live action.</chess_error>",
+                    })
+                    continue
+                live_call_seen = True
+
             if tool_name == PLAY_MOVE_TOOL["function"]["name"]:
-                if has_play_move:
-                    result = "<chess_error>Multiple play_move calls in one response are not allowed.</chess_error>"
-                else:
-                    result = _play_move(self.chess_client, arguments)
-                    has_play_move = True
+                result = _play_move(self.chess_client, arguments)
                 if "<chess_error>" not in result:
                     try:
                         new_state = json.loads(result)

@@ -288,8 +288,6 @@ class Agent:
             raise
         self.api_responses.append(response.model_dump(mode="json"))
         self.steps_taken += 1
-        if response.choices[0].finish_reason == "stop":
-            self.finished = True
         message = self.process_response(response)
         tool_names = [
             call.get("function", {}).get("name", "unknown")
@@ -303,8 +301,8 @@ class Agent:
             )
         else:
             print(
-                f"[agent] step {step_number}: "
-                + ("model finished" if self.finished else "response contained no parsed tool call; continuing"),
+                f"[agent] step {step_number}: response contained no parsed tool call; "
+                "the loop should preserve the response and continue",
                 flush=True,
             )
         return message
@@ -484,15 +482,23 @@ class Agent:
             # logging.
 
             for step in range(self.step_limit):
+                if self.finished:
+                    break
                 self.maybe_compact_context()
                 response = self.query_language_model()
                 self.assistant_messages.append(response)
-                if "tool_calls" in response:
-                    tool_calls = response["tool_calls"]
+                tool_calls = response.get("tool_calls") or []
+                if tool_calls:
                     tool_results = self.execute_tool_calls(tool_calls)
                     self.assistant_messages.extend(tool_results)
-                # Retain the final response as context; a stop finish reason
-                # from the action request marks the run complete.
+                elif not self.finished:
+                    self.assistant_messages.append({
+                        "role": "user",
+                        "content": "No tool call was received. Continue using the available "
+                        "tools until the task's completion condition is reached.",
+                    })
+                # Only domain completion signals (for example send_message or
+                # a terminal game state), not a text-only reply, finish a run.
 
                 if self.finished:
                     print(f"[agent] finished after {step} steps", flush=True)
