@@ -201,4 +201,32 @@ SIMULATE_MOVE_TOOL: dict = {
 }
 
 # TODO()
-RUN_PYTHON_TOOL: dict = {}
+RUN_PYTHON_TOOL: dict = {
+    "type": "function",
+    "function": {
+        "name": "run_python",
+        "description": (
+            """
+            Run a Python script.
+            The script can call simulate_move and play_move as ordinary synchronous Python functions.
+            The script prints one JSON object with stdout, stderr, and error from running the code -- return that string as it is.
+            A non-zero returncode means the sandbox itself failed, not the model's code.
+            """
+        ),
+        "strict": True,
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "description": (
+                        "The Python code to run."
+                    ),
+                },
+            },
+            "required": ["code"],
+            "additionalProperties": False,
+        },
+    },
+}
+

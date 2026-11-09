@@ -39,6 +39,13 @@ class SimulateMoveArguments(ToolArguments):
     )
 
 
+class RunPythonArguments(ToolArguments):
+    code: str = Field(
+        ...,
+        description="The Python code to run in the sandbox.",
+    )
+
+
 def _request_state(
     client: httpx.Client, method: str, endpoint: str, **kwargs: Any
 ) -> dict[str, Any]:
@@ -148,7 +155,27 @@ def _run_python(env: Any, port: int, arguments: str) -> str:
     #
     # Return <chess_error>{message}</chess_error> if there are issues like type
     # mismatches or parsing failures.
-    raise NotImplementedError
+    try:
+        args = RunPythonArguments.model_validate_json(arguments)
+    except ValidationError as exc:
+        return f"<chess_error>Invalid arguments: {exc}</chess_error>"
+
+    try:
+        code_b64 = base64.b64encode(args.code.encode()).decode()
+        result = env.execute(
+            ["python", "/opt/assignment/sandbox_python.py", str(port), code_b64],
+            shell=False,
+        )
+        if result.get("returncode") != 0 or result.get("exception_info"):
+            message = (
+                result.get("exception_info")
+                or result.get("stderr")
+                or f"Sandbox command failed with return code {result.get('returncode')}"
+            )
+            return f"<chess_error>{message}</chess_error>"
+        return result["stdout"]
+    except Exception as exc:
+        return f"<chess_error>Sandbox execution error: {exc}</chess_error>"
 
 
 def _invoke_skill(skills: dict[str, dict[str, str]], arguments: str) -> str:

@@ -154,6 +154,7 @@ class ChessAgent(Agent):
             f"Play this game as White. {opening_instruction}\n\n"
             f"{self.format_state(initial_state)}"
         )
+        self.programmatic_tools = programmatic_tools
 
     def format_state(self, state: dict[str, Any]) -> str:
         """Format a state according to this run's observation condition."""
@@ -180,6 +181,8 @@ class ChessAgent(Agent):
         if self.skills:
             valid_tool_names.append(INVOKE_SKILL_TOOL["function"]["name"])
         valid_tool_names.append(SIMULATE_MOVE_TOOL["function"]["name"])
+        if self.programmatic_tools:
+            valid_tool_names.append(RUN_PYTHON_TOOL["function"]["name"])
 
         tool_results = []
         has_play_move = False
@@ -228,6 +231,9 @@ class ChessAgent(Agent):
                         "content": result,
                     }
                 )
+
+            # TODO(Part 3.3-4): add cases for simulate_move and run_python, with
+            # linked observations and recoverable errors, just like the old tool.
             if tool_name == SIMULATE_MOVE_TOOL["function"]["name"]:
                 result = _simulate_move(self.chess_client, arguments)
                 tool_results.append(
@@ -237,6 +243,23 @@ class ChessAgent(Agent):
                         "content": result,
                     }
                 )
-        # TODO(Part 3.3-4): add cases for simulate_move and run_python, with
-        # linked observations and recoverable errors, just like the old tool.
+
+            if tool_name == RUN_PYTHON_TOOL["function"]["name"]:
+                result = _run_python(self.env, self.python_sandbox_port, arguments)
+                # A snippet may commit a move before failing, so always refresh.
+                try:
+                    new_state = _game_state(self.chess_client, reset=False)
+                    observation = self.format_state(new_state)
+                    self.last_state = new_state
+                    self.finished = bool(new_state.get("game_over"))
+                    result += "\n\n" + observation
+                except Exception as exc:
+                    result += f"\n\n<chess_error>Failed to retrieve game state: {exc}</chess_error>"
+                tool_results.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call_id,
+                        "content": result,
+                    }
+                )
         return tool_results
