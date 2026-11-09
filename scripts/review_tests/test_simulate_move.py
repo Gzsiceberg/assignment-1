@@ -9,6 +9,7 @@ import pytest
 from assignment.agent import ChessAgent
 from assignment.agent.chess_tools import _simulate_move
 from assignment.agent.tools import SIMULATE_MOVE_TOOL
+from assignment.errors import InfrastructureError
 
 
 START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -147,14 +148,15 @@ def test_simulate_move_server_rejections_are_recoverable(simulation_client, args
 
 
 @pytest.mark.parametrize("error_type", [httpx.ConnectError, httpx.ReadTimeout])
-def test_simulate_move_transport_failures_are_recoverable(error_type):
+def test_simulate_move_transport_failures_abort_run(error_type):
     def handler(request):
         raise error_type("connection failed", request=request)
 
     with httpx.Client(
         base_url="http://chess.test", transport=httpx.MockTransport(handler)
     ) as client:
-        assert_chess_error(_simulate_move(client, json.dumps({"fen": START_FEN})))
+        with pytest.raises(InfrastructureError, match="transport failure"):
+            _simulate_move(client, json.dumps({"fen": START_FEN}))
 
 
 def test_simulate_move_dispatch_preserves_live_state(simulation_agent, simulation_client):

@@ -32,6 +32,7 @@ from assignment.prompts import (
     PROGRAMMATIC_CHESS_PROMPT,
 )
 from assignment.env import Environment
+from assignment.errors import InfrastructureError
 
 
 def format_chess_state(
@@ -123,7 +124,10 @@ class ChessAgent(Agent):
                 raise ValueError(
                     "ChessAgent needs an environment with server_url or an http_client."
                 )
-            http_client = httpx.Client(base_url=server_url, timeout=20)
+            http_client = httpx.Client(
+                base_url=server_url, timeout=20,
+                limits=httpx.Limits(max_keepalive_connections=0),
+            )
         self.chess_client = http_client
 
         initial_state = _game_state(self.chess_client, reset=reset_game)
@@ -271,6 +275,8 @@ class ChessAgent(Agent):
                     self.last_state = new_state
                     self.finished = bool(new_state.get("game_over"))
                     result += "\n\n" + observation
+                except InfrastructureError:
+                    raise
                 except Exception as exc:
                     result += f"\n\n<chess_error>Failed to retrieve game state: {exc}</chess_error>"
                 tool_results.append(

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import posixpath
 import time
 from pathlib import PurePath
@@ -8,6 +9,10 @@ import modal
 from swerex.deployment.modal import ModalDeployment
 from swerex.runtime.abstract import Command
 from swerex.runtime.remote import RemoteRuntime
+
+from assignment.errors import InfrastructureError
+
+logger = logging.getLogger(__name__)
 
 
 def _tls_port_configuration(
@@ -267,7 +272,7 @@ class Environment:
             # sandbox that is gone is terminal: every later command fails the
             # same way, so raise rather than let the caller keep going.
             if not self.is_alive():
-                raise RuntimeError(
+                raise InfrastructureError(
                     "The sandbox is no longer running, so no further commands can "
                     f"be executed. Last error: {e}"
                 ) from e
@@ -326,6 +331,12 @@ class Environment:
         """Enter a `with` block. The sandbox is already running by this point."""
         return self
 
-    def __exit__(self, *exc):
-        """Terminate the sandbox on leaving a `with` block, including on error."""
-        self.stop()
+    def __exit__(self, exc_type, exc_value, traceback):
+        """Clean up without masking an exception from the task."""
+        try:
+            self.stop()
+        except Exception:
+            if exc_type is None:
+                raise
+            logger.exception("Sandbox cleanup failed while handling task failure")
+        return False

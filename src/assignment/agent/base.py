@@ -11,6 +11,7 @@ import json
 import logging
 import math
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -527,7 +528,13 @@ class Agent:
             if self.auto_stop_environment:
                 stop = getattr(self.env, "stop", None)
                 if callable(stop):
-                    stop()
+                    task_failed = sys.exc_info()[0] is not None
+                    try:
+                        stop()
+                    except Exception:
+                        if not task_failed:
+                            raise
+                        logger.exception("Environment cleanup failed while handling task failure")
 
     def execute_tool_calls(
         self, tool_calls: list[dict[str, Any]]

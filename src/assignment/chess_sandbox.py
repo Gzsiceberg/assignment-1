@@ -34,6 +34,7 @@ SANDBOX_FILES = (
     Path(__file__).with_name("chess_server.py"),
     Path(__file__).parent / "agent" / "chess_tools.py",
     Path(__file__).with_name("sandbox_python.py"),
+    Path(__file__).with_name("errors.py"),
 )
 
 def _with_assignment_files(image):

@@ -7,11 +7,14 @@ PYTHONPATH. Simulation reconstructs a position from FEN, never the live game.
 from __future__ import annotations
 
 import argparse
+from collections import OrderedDict
+from threading import Lock
 
 import chess
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
+from chess_app.server import MoveRequest, create_app as create_chess_app
 
 class SimulationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -71,9 +74,41 @@ def simulate_position(fen: str, move: str | None = None) -> dict:
     }
 
 def create_app(game=None) -> FastAPI:
-    from chess_app.server import create_app as create_chess_app
-
     app = create_chess_app(game)
+
+    # Serialize commits and cache their responses before sending them through
+    # the tunnel. A lost response can then be retried without a second move.
+    lock = Lock()
+    completed = OrderedDict()
+    move_route = next(r for r in app.routes if getattr(r, "path", None) == "/api/move")
+    reset_route = next(r for r in app.routes if getattr(r, "path", None) == "/api/reset")
+    original_move, original_reset = move_route.endpoint, reset_route.endpoint
+    app.routes.remove(move_route)
+    app.routes.remove(reset_route)
+
+    @app.post("/api/move")
+    def play_move(
+        request: MoveRequest,
+        idempotency_key: str | None = Header(default=None, max_length=128),
+    ) -> dict:
+        with lock:
+            if idempotency_key and idempotency_key in completed:
+                previous_move, result = completed[idempotency_key]
+                if previous_move != request.move:
+                    raise HTTPException(status_code=409, detail="Request ID reused for a different move")
+                return result
+            result = original_move(request)
+            if idempotency_key:
+                completed[idempotency_key] = (request.move, result)
+                if len(completed) > 1024:
+                    completed.popitem(last=False)
+            return result
+
+    @app.post("/api/reset")
+    def reset_game() -> dict:
+        with lock:
+            # Retain IDs so delayed retries cannot commit in the new game.
+            return original_reset()
 
     @app.post("/api/simulate")
     def simulate(request: SimulationRequest) -> dict:
