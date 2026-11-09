@@ -5,6 +5,12 @@ description: Strategy to pick a chess move.
 
 Use available tools to select a good move.
 
+**Hard search limit: at most two plies from the current live position** —
+White's candidate move, then Black's reply. Evaluate immediately after that
+reply; never simulate a third or fourth ply, even to break ties or improve a
+score. Do not deepen or repeat the search. Finish by calling `play_move(best)`
+once at the end of the same Python snippet.
+
 # The two tools
 
 Everything below is built out of exactly two calls, and the distinction between
@@ -14,8 +20,8 @@ them matters:
   the position, with `fen`, `legal_moves`, `game_over`, `winner` and `result`.
   Passing `move=None` just inspects a FEN; passing a UCI move plays that one ply
   and returns the position after it. It never touches the live board and never
-  invokes the opponent, so chain its returned `fen` values to roll out a line as
-  deep as you like, for either side.
+  invokes the opponent. Chain its returned `fen` values only for your candidate
+  move and Black's reply, respecting the two-ply limit above.
 - `play_move(move)` — the **commit** tool. It plays one move on the real board
   and the opponent answers. Call it exactly once, at the very end, with the move
   the search chose. Never call it to explore.
